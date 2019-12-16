@@ -1,0 +1,138 @@
+// Copyright (c) 2019 IBM Corporation and others.
+// Licensed under Creative Commons Attribution-NoDerivatives
+// 4.0 International (CC BY-ND 4.0)
+//   https://creativecommons.org/licenses/by-nd/4.0/
+//
+// Contributors:
+//   IBM Corporation
+:projectid: kafka-intro
+:page-layout: guide-multipane
+:page-duration: 15 minutes
+:page-releasedate: 2019-09-13
+:page-guide-category: microprofile
+:page-essential: false
+:page-description: Learn how to deploy the Apache Kafka platform to implement real-time data streaming between systems
+:page-seo-title: Consuming data streams using Apache Kafka
+:page-seo-description: A tutorial on how to use Apache Kafka to enable real-time data streaming between systems in an application
+:guide-author: Open Liberty
+:page-tags: ['MicroProfile', 'Java EE', 'Jakarta EE']
+:page-permalink: /guides/{projectid}
+:page-related-guides: ['microprofile-rest-client', 'microprofile-rest-client-async']
+:common-includes: https://raw.githubusercontent.com/OpenLiberty/guides-common/master
+:imagesdir: /img/guide
+:source-highlighter: prettify
+:mac: MAC
+:win: WINDOWS
+:linux: LINUX
+= Consuming data streams using Apache Kafka
+
+[.hidden]
+NOTE: This repository contains the guide documentation source. To view the guide in published form, view it on the https://openliberty.io/guides/{projectid}.html[Open Liberty website].
+
+Learn how to deploy the Apache Kafka platform to implement real-time data streaming between systems
+
+== What you’ll learn
+
+You will learn about Kafka, a platform that handles real-time data streams that allows for more elegant and efficient communication between systems. You will then learn to implement a Kafka solution. First, you will create a producer that will generate records and push them to a Kafka server. Then you will create a consumer that will pull those records from the server and process them.
+
+== What is Kafka
+
+https://kafka.apache.org/[Apache Kafka^] is a stream-processing platform that manages communication in distributed systems. Communication is message-oriented, and follows the publish-subscribe model. Kafka allows for real-time stream processing and distributed, replicated storage of streams and messages.
+
+A stream of records is called a topic which is stored as a partitioned log. Records are added to the logs by the producer, which will add records to the ends of each partition along with a timestamp. Consumers will then read data from these logs, starting from the beginning of each one. Once a record has been consumed, it will be removed after a configured retention period, typically 24 hours, has passed. Records are removed starting from the head of the partition (FIFO). Simply put, a topic is a collection of different queues of records.
+Multiple consumers can read from the same partition and each consumer will have its own offset value to keep track of where it is reading from the partition. Each record will only be read once and there are multiple consumers active in the same partition, so you may wonder if this system is error prone and the answer is no. Kafka uses Apache Zookeeper to store data about the consumers and partition. Zookeeper keeps track of, among other things, the already consumed records, meaning we can avoid duplicate consumptions and avoid faults in this respect.
+
+Topics run on servers that are called Kafka brokers, and groups of these brokers form a cluster. These brokers then act as the contact points for the producers and the consumers. The producers will, in batches, push messages to the broker and similarly, the consumers will pull records from the broker. In your application, you will have to create a producer and consumer that will interact with each other through the Kafka server.
+
+== Application
+
+The application you will be working with is a job manager that maintains an inventory of available systems.
+It consists of four microservices, `gateway`, `job`, `system`, and `inventory`.
+The `job` microservice allows you to dispatch jobs that will be run by the `system` microservice.
+The job is a sleep operation used to represent a slow task that lasts for a duration of 5 to 10 seconds. When it completes, the `system` microservice
+reports the sleep time as the result of this job. In addition to running jobs, the `system` microservice also registers
+itself on startup with the `inventory` microservice that keeps track of all instances of the `system` microservice. Finally,
+the `gateway` microservice is a https://microservices.io/patterns/apigateway.html#variation-backends-for-frontends[backend for frontend^] service.
+It communicates with the backend `job` and `inventory` microservices on the caller's behalf.
+
+image::reactive-inventory-system.png[Reactive Inventoryx System,align="center"]
+
+The two microservices you will modify are the `system` and `inventory` services. The `inventory` service monitors the status of instances of the `system` service. 
+
+The implementations of the application and its services are provided for you in the `start/src` directory.
+
+// =================================================================================================
+// Getting started
+// =================================================================================================
+
+[role='command']
+include::{common-includes}/gitclone.adoc[]
+
+== Configuring the producer
+
+To begin, we have to set up our producer so that we can generate data for our system. The producer has to generate records and push them to the Kafka broker.
+
+[role="code_command hotspot file=0”, subs="quotes”]
+----
+#Replace the `SystemProducer` class.#
+`system/src/main/java/io/openliberty/guides/system/SystemProducer.java`
+----
+SystemProducer.java
+[source, Java, linenums, role='code_column hide_tags=copyright']
+----
+include::finish/system/src/main/java/io/openliberty/guides/system/SystemProducer.java[]
+----
+
+First, we have to configure the properties of the producer of which we require at least three. The first is setting the bootstrap server property. This property is set with the [hotspot=serverConfig file=0]`ProducerConfig.BOOTSTRAP_SERVERS_CONFIG` which creates the connection between the cluster and the producer. The next two properties are the [hotspot=keySerialConfig file=0]`ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG` and the [hotspot=valueSerialConfig file=0]`ProducerConfig.VALUE_SERIALIZER_CONFIG`. These are required so that the system knows what kind of serializer to use to convert your records into bytes. In this case, we are using `StringSerializer` because the keys and values of our produced records will be of type `String`. These properties are then used to create the actual producer by calling [hotspot=producerCreate file=0]`KafkaProducer()`
+
+Finally, we create the [hotspot file=0]`sendMessage()` method to create a ProducerRecord, which will be serialized and sent to the broker. Notice how the actual sending is performed by the built-in [hotspot file=0]`send()` and not our defined [hotspot file=0]`sendMessage()` method. The former is asynchronous and will have a result containing the partition the record was sent to, its offset within the partition as well as its timestamp. 
+
+Producers can batch records before they are actually sent. Once [hotspot=sendMessage file=0]`send()` completes, records are put in the buffer and the method immediately returns so more records may be fetched. This means that multiple records can be grouped together and sent at once instead of sending one at a time. This allows Kafka to achieve better overall throughput while only paying a small latency penalty.
+
+Producers support a lot more functionality that is not shown in this example. We can set an `acks` configuration so that transactions are only complete if we receive an acknowledgement, allowing us to trade speed for consistency. We can also configure the buffer size, allowing us to reduce our total number of transactions with the broker and increasing efficiency. You can read about these configurations and more in the https://kafka.apache.org/23/javadoc/index.html?org/apache/kafka/clients/producer/KafkaProducer.html[KafkaProducer documentation^]
+
+
+== Configuring the consumer
+
+Similarly to the producer, we must first set some basic configurations before actually creating an instance of the `KafkaConsumer` class.
+
+[role=“code_command hotspot file=0”,subs=“quotes”]
+----
+#Replace the `SystemConsumer` class.#
+`inventory/src/main/java/io/openliberty/guides/inventory/SystemConsumer.java`
+----   
+SystemConsumer.java
+[source, Java, linenums, role='code_column hide_tags=copyright']
+----
+include::start/inventory/src/main/java/io/openliberty/guides/inventory/SystemConsumer.java[]
+----
+
+We have the three equivalent minimal required configurations: [hotspot=serverConfig file=0]`ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG`, [hotspot=keyDeserialConfig file=0]`ConsumerConfig.KEY_SERIALIZER_CLASS_CONFIG` and [hotspot=valueDeserialConfig file=0]`ConsumerConfig.VALUE_SERIALIZER_CLASS_CONFIG`. On top of these three, we need some additional configurations. One required configuration is the [hotspot=groupIdConfig file=0]`ConsumerConfig.GROUP_ID_CONFIG`, which allows you to group your various consumers for better synchronization. The final configuration in this consumer is the [hotspot=offsetConfig file=0]`ConsumerConfig.AUTO_OFFSET_RESET_CONFIG` which defines the behaviour of the consumer when its offset (index in partition) is not valid or defined. So it helps handle the offset when the consumer is initialized or when its offset is out of index. In this case, we reset the offset its [hotspot=offsetValue file=0]`earliest` valid offset. You can add additional configurations to suit your needs in the https://kafka.apache.org/23/javadoc/index.html?org/apache/kafka/clients/consumer/KafkaConsumer.html[KafkaConsumer documentation^]
+
+After the properties have been set and the consumer created, the consumer is connected to the producer via the [hotspot=subscribe file=0]`subscribe()` method. The consumer subscribes to the producer, so that it can retrieve records after they are created. Subscribers are not explicitly informed of updates, instead they must poll the Kafka server for changes. This is done using the [hotspot=consumerPoll file=0]`Consumer.poll()` method in the [hotspot=consumerInstance file=0]`Kafka.clients.consumer.Consumer` class. In this case, the method is called in the [hotspot=consumeMessages file=0]`consumeMessages()` method and takes an argument of [hotspot=consumerPoll file=0]`Duration.ofSeconds(3)` which tells the consumer to only poll every 3 seconds. Records are stored as `ConsumerRecords<T>` objects and can then be manipulated however we want. The consumer will then commit its offset to the broker to indicate the number of consecutive records that have been committed. This is done using the [hotspot=commitAsync file=0]`commitAsync()` method. Kafka also supports automatic commits with the `enable.auto.commit = true` property as well as synchronous manual commits with the `commitSync()` method. Without this call, the consumers index in each partition will never be updated.
+
+The retrieved records are then parsed from JSON into a `Properties` class and the system status will be updated depending on the results in the record.
+
+== Big Picture
+
+What you have made is a simple connection that moves a service status from one service to another. In the overall application, there are more Kafka connections in the whole application that we have not explicitly shown you. There are two more sets of producers and consumers between the `Job` and `System` services. The `Job` service has a producer (`JobProducer`) that creates new jobs that are published to a Kafka broker, and `SystemRunnable` contains the `System` service’s consumer that will take those jobs, and process them. `SystemProducer` (note: same producer as before) will then reciprocate and push the results to the Kafka broker. Then the `SystemConsumer` class and the `JobConsumer` class will consume their respective data. So in total, there are 3 Kafka connections in this application, of which you created one.
+
+== Running the application
+
+
+
+== Testing the application
+
+A test has been provided for you to test the basic functionality of the consumer. If the test fails, then you may have introduced a bug into the code.
+
+[role="code_command hotspot", subs="quotes"]
+----
+#Create the `InventoryEndpointIT` class.#
+`inventory/src/test/java/it/io/openliberty/guides/inventory/InventoryEndpointIT.java`
+----
+InventoryEndpointIT.java
+[source, Java, linenums, role='code_column hide_tags=copyright']
+----
+include::finish/inventory/src/test/java/it/io/openliberty/guides/inventory/InventoryEndpointIT.java[]
+----
+
