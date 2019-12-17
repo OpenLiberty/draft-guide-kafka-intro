@@ -72,7 +72,7 @@ include::{common-includes}/gitclone.adoc[]
 
 To begin, we have to set up our producer so that we can generate data for our system. The producer has to generate records and push them to the Kafka broker.
 
-[role="code_command hotspot”, subs="quotes”]
+[role="code_command hotspot", subs="quotes"]
 ----
 #Create the `SystemProducer` class.#
 `system/src/main/java/io/openliberty/guides/system/SystemProducer.java`
@@ -96,7 +96,7 @@ Producers support a lot more functionality that is not shown in this example. We
 
 Similarly to the producer, we must first set some basic configurations before actually creating an instance of the `KafkaConsumer` class.
 
-[role=“code_command hotspot”,subs=“quotes”]
+[role="code_command hotspot", subs="quotes"]
 ----
 #Create the `SystemConsumer` class.#
 `inventory/src/main/java/io/openliberty/guides/inventory/SystemConsumer.java`
