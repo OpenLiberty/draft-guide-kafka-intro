@@ -72,9 +72,9 @@ include::{common-includes}/gitclone.adoc[]
 
 To begin, we have to set up our producer so that we can generate data for our system. The producer has to generate records and push them to the Kafka broker.
 
-[role="code_command hotspot file=0”, subs="quotes”]
+[role="code_command hotspot”, subs="quotes”]
 ----
-# Create the `SystemProducer` class. #
+#Create the `SystemProducer` class.#
 `system/src/main/java/io/openliberty/guides/system/SystemProducer.java`
 ----
 SystemProducer.java
@@ -96,9 +96,9 @@ Producers support a lot more functionality that is not shown in this example. We
 
 Similarly to the producer, we must first set some basic configurations before actually creating an instance of the `KafkaConsumer` class.
 
-[role=“code_command hotspot file=0”,subs=“quotes”]
+[role=“code_command hotspot”,subs=“quotes”]
 ----
-# Create the `SystemConsumer` class. #
+#Create the `SystemConsumer` class.#
 `inventory/src/main/java/io/openliberty/guides/inventory/SystemConsumer.java`
 ----   
 SystemConsumer.java
@@ -113,7 +113,7 @@ After the properties have been set and the consumer created, the consumer is con
 
 The retrieved records are then parsed from JSON into a `Properties` class and the system status will be updated depending on the results in the record.
 
-*Big Picture*
+*Big Picture* +
 What you have made is a simple connection that moves a service status from one service to another. In the overall application, there are more Kafka connections in the whole application that we have not explicitly shown you. There are two more sets of producers and consumers between the `Job` and `System` services. The `Job` service has a producer (`JobProducer`) that creates new jobs that are published to a Kafka broker, and `SystemRunnable` contains the `System` service’s consumer that will take those jobs, and process them. `SystemProducer` (note: same producer as before) will then reciprocate and push the results to the Kafka broker. Then the `SystemConsumer` class and the `JobConsumer` class will consume their respective data. So in total, there are 3 Kafka connections in this application, of which you created one.
 
 // =================================================================================================
