@@ -74,7 +74,7 @@ To begin, we have to set up our producer so that we can generate data for our sy
 
 [role="code_command hotspot file=0”, subs="quotes”]
 ----
-#Create the `SystemProducer` class.#
+# Create the `SystemProducer` class. #
 `system/src/main/java/io/openliberty/guides/system/SystemProducer.java`
 ----
 SystemProducer.java
@@ -98,13 +98,13 @@ Similarly to the producer, we must first set some basic configurations before ac
 
 [role=“code_command hotspot file=0”,subs=“quotes”]
 ----
-#Create the `SystemConsumer` class.#
+# Create the `SystemConsumer` class. #
 `inventory/src/main/java/io/openliberty/guides/inventory/SystemConsumer.java`
 ----   
 SystemConsumer.java
 [source, Java, linenums, role='code_column hide_tags=copyright']
 ----
-include::start/inventory/src/main/java/io/openliberty/guides/inventory/SystemConsumer.java[]
+include::finish/inventory/src/main/java/io/openliberty/guides/inventory/SystemConsumer.java[]
 ----
 
 We have the three equivalent minimal required configurations: [hotspot=serverConfig file=0]`ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG`, [hotspot=keyDeserialConfig file=0]`ConsumerConfig.KEY_SERIALIZER_CLASS_CONFIG` and [hotspot=valueDeserialConfig file=0]`ConsumerConfig.VALUE_SERIALIZER_CLASS_CONFIG`. On top of these three, we need some additional configurations. One required configuration is the [hotspot=groupIdConfig file=0]`ConsumerConfig.GROUP_ID_CONFIG`, which allows you to group your various consumers for better synchronization. The final configuration in this consumer is the [hotspot=offsetConfig file=0]`ConsumerConfig.AUTO_OFFSET_RESET_CONFIG` which defines the behaviour of the consumer when its offset (index in partition) is not valid or defined. So it helps handle the offset when the consumer is initialized or when its offset is out of index. In this case, we reset the offset its [hotspot=offsetValue file=0]`earliest` valid offset. You can add additional configurations to suit your needs in the https://kafka.apache.org/23/javadoc/index.html?org/apache/kafka/clients/consumer/KafkaConsumer.html[KafkaConsumer documentation^]
@@ -113,7 +113,7 @@ After the properties have been set and the consumer created, the consumer is con
 
 The retrieved records are then parsed from JSON into a `Properties` class and the system status will be updated depending on the results in the record.
 
-- *Big Picture*
+*Big Picture*
 What you have made is a simple connection that moves a service status from one service to another. In the overall application, there are more Kafka connections in the whole application that we have not explicitly shown you. There are two more sets of producers and consumers between the `Job` and `System` services. The `Job` service has a producer (`JobProducer`) that creates new jobs that are published to a Kafka broker, and `SystemRunnable` contains the `System` service’s consumer that will take those jobs, and process them. `SystemProducer` (note: same producer as before) will then reciprocate and push the results to the Kafka broker. Then the `SystemConsumer` class and the `JobConsumer` class will consume their respective data. So in total, there are 3 Kafka connections in this application, of which you created one.
 
 // =================================================================================================
